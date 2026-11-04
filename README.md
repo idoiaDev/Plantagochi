@@ -2,6 +2,10 @@
 
 > ⚠️ **Beta** – Proyecto en desarrollo activo. Puede contener errores o cambios sin previo aviso.
 
+## Vídeos del proyecto
+
+[Ver lista de reproducción de Plantagochi en YouTube](https://www.youtube.com/playlist?list=PLK5L2j2kSzrc)
+
 ## Descripción
 
 Plantagochi es un sistema IoT animado para el cuidado y monitorización de plantas.
@@ -285,6 +289,7 @@ cp config.example.h config.h
 3. Definir en `config.h` el `DEVICE_ID`, la `BASE_URL` de la API, las credenciales WiFi y la calibración del sensor (`HUM_RAW_DRY` / `HUM_RAW_WET`).
 
    El `DEVICE_ID` **debe ser exactamente el mismo** `device_id` que se introdujo al crear la planta desde la app móvil, y esa planta debe existir ya en la base de datos. Ese identificador es lo que vincula la ESP32 con su planta: los `POST /plantagochi/state` buscan la planta por `device_id`, así que si no coincide (o la planta no existe todavía), el servidor responderá `404 device_id desconocido`.
+
 4. Subir el sketch a la ESP32.
 
 ## API
@@ -293,52 +298,52 @@ Todas las rutas cuelgan del prefijo `/plantagochi`. Resumen de los endpoints, ag
 
 ### Plantas
 
-| Método | Ruta | Descripción |
-| ------ | ---- | ----------- |
-| `GET` | `/plantagochi/all` | Lista todas las plantas con su estado y última medición. |
-| `GET` | `/plantagochi/device/{device_id}` | Planta asociada a un `device_id`. |
-| `GET` | `/plantagochi/last-update` | Firma de la última actualización (estado, plantas e imágenes) para el polling de la app y la web. |
-| `POST` | `/plantagochi` | Crea una planta (y genera su embedding). |
-| `PUT` | `/plantagochi/{plant_id}` | Actualiza una planta. |
-| `PATCH` | `/plantagochi/{plant_id}/threshold` | Actualiza el umbral de riego. |
-| `DELETE` | `/plantagochi/{plant_id}` | Elimina una planta. |
+| Método   | Ruta                                | Descripción                                                                                       |
+| -------- | ----------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `GET`    | `/plantagochi/all`                  | Lista todas las plantas con su estado y última medición.                                          |
+| `GET`    | `/plantagochi/device/{device_id}`   | Planta asociada a un `device_id`.                                                                 |
+| `GET`    | `/plantagochi/last-update`          | Firma de la última actualización (estado, plantas e imágenes) para el polling de la app y la web. |
+| `POST`   | `/plantagochi`                      | Crea una planta (y genera su embedding).                                                          |
+| `PUT`    | `/plantagochi/{plant_id}`           | Actualiza una planta.                                                                             |
+| `PATCH`  | `/plantagochi/{plant_id}/threshold` | Actualiza el umbral de riego.                                                                     |
+| `DELETE` | `/plantagochi/{plant_id}`           | Elimina una planta.                                                                               |
 
 ### Ingesta de humedad (ESP32)
 
-| Método | Ruta | Descripción |
-| ------ | ---- | ----------- |
-| `POST` | `/plantagochi/state` | Ingesta de humedad por `device_id` (la que usa la ESP32). |
+| Método | Ruta                      | Descripción                                                                         |
+| ------ | ------------------------- | ----------------------------------------------------------------------------------- |
+| `POST` | `/plantagochi/state`      | Ingesta de humedad por `device_id` (la que usa la ESP32).                           |
 | `POST` | `/plantagochi/{plant_id}` | Ingesta de humedad por id de planta (ruta antigua, se mantiene por compatibilidad). |
 
 ### Tipos de planta
 
-| Método | Ruta | Descripción |
-| ------ | ---- | ----------- |
-| `GET` | `/plantagochi/types` | Lista los tipos de planta. |
-| `POST` | `/plantagochi/types` | Crea un tipo de planta. |
-| `POST` | `/plantagochi/types/{type_id}/images` | Sube y/o actualiza el nombre y las imágenes de un tipo (multipart). |
-| `POST` | `/plantagochi/types/images/refresh` | Regenera las imágenes de todos los tipos desde `api/images/`. |
-| `POST` | `/plantagochi/types/{type_id}/images/refresh` | Regenera las imágenes de un tipo concreto. |
+| Método | Ruta                                          | Descripción                                                         |
+| ------ | --------------------------------------------- | ------------------------------------------------------------------- |
+| `GET`  | `/plantagochi/types`                          | Lista los tipos de planta.                                          |
+| `POST` | `/plantagochi/types`                          | Crea un tipo de planta.                                             |
+| `POST` | `/plantagochi/types/{type_id}/images`         | Sube y/o actualiza el nombre y las imágenes de un tipo (multipart). |
+| `POST` | `/plantagochi/types/images/refresh`           | Regenera las imágenes de todos los tipos desde `api/images/`.       |
+| `POST` | `/plantagochi/types/{type_id}/images/refresh` | Regenera las imágenes de un tipo concreto.                          |
 
 ### Imágenes de tipo (para la ESP32 y el dashboard)
 
-| Método | Ruta | Descripción |
-| ------ | ---- | ----------- |
-| `GET` | `/plantagochi/types/{type_id}/manifest` | Manifest: qué frames hay y cuánto ocupa cada uno (lo usa la ESP32). |
-| `GET` | `/plantagochi/types/{type_id}/images/{state}/raw` | Un frame RGB565 crudo (`?frame=0..2`, por defecto 0). |
-| `GET` | `/plantagochi/types/{type_id}/images/{state}/png` | Un frame en PNG (`?frame=0..2`, por defecto 0). |
-| `GET` | `/plantagochi/types/{type_id}/images/{state}/all/raw` | Los 3 frames del estado concatenados. |
+| Método | Ruta                                                  | Descripción                                                         |
+| ------ | ----------------------------------------------------- | ------------------------------------------------------------------- |
+| `GET`  | `/plantagochi/types/{type_id}/manifest`               | Manifest: qué frames hay y cuánto ocupa cada uno (lo usa la ESP32). |
+| `GET`  | `/plantagochi/types/{type_id}/images/{state}/raw`     | Un frame RGB565 crudo (`?frame=0..2`, por defecto 0).               |
+| `GET`  | `/plantagochi/types/{type_id}/images/{state}/png`     | Un frame en PNG (`?frame=0..2`, por defecto 0).                     |
+| `GET`  | `/plantagochi/types/{type_id}/images/{state}/all/raw` | Los 3 frames del estado concatenados.                               |
 
 ### Búsqueda semántica
 
-| Método | Ruta | Descripción |
-| ------ | ---- | ----------- |
+| Método | Ruta                  | Descripción                                                     |
+| ------ | --------------------- | --------------------------------------------------------------- |
 | `POST` | `/plantagochi/search` | Busca plantas por descripción en lenguaje natural (embeddings). |
 
 ### Notificaciones push
 
-| Método | Ruta | Descripción |
-| ------ | ---- | ----------- |
+| Método | Ruta                      | Descripción                            |
+| ------ | ------------------------- | -------------------------------------- |
 | `POST` | `/plantagochi/push-token` | Registra el token de push de un móvil. |
 
 > Dar de baja un token **no** tiene endpoint: lo gestiona el propio servidor.
@@ -357,14 +362,14 @@ Estados disponibles: `superhappy`, `happy`, `sad` y `supersad`.
 
 ## Comandos de desarrollo
 
-| Componente | Comando | Descripción |
-| ---------- | ------- | ----------- |
-| `web/` | `npm run dev` | Servidor de desarrollo con HMR. |
-| `web/` | `npm run build` | Build de producción. |
-| `web/` | `npm run preview` | Sirve localmente el build de producción. |
-| `web/` | `npm run lint` | Lint con ESLint. |
-| `mobile/` | `npm start` | Inicia Expo. |
-| `mobile/` | `npm run android` | Inicia Expo en Android. |
-| `mobile/` | `npm run ios` | Inicia Expo en iOS. |
-| `mobile/` | `npm run lint` | Lint con ESLint. |
-| `api/` | `uvicorn main:app --reload` | API en modo desarrollo. |
+| Componente | Comando                     | Descripción                              |
+| ---------- | --------------------------- | ---------------------------------------- |
+| `web/`     | `npm run dev`               | Servidor de desarrollo con HMR.          |
+| `web/`     | `npm run build`             | Build de producción.                     |
+| `web/`     | `npm run preview`           | Sirve localmente el build de producción. |
+| `web/`     | `npm run lint`              | Lint con ESLint.                         |
+| `mobile/`  | `npm start`                 | Inicia Expo.                             |
+| `mobile/`  | `npm run android`           | Inicia Expo en Android.                  |
+| `mobile/`  | `npm run ios`               | Inicia Expo en iOS.                      |
+| `mobile/`  | `npm run lint`              | Lint con ESLint.                         |
+| `api/`     | `uvicorn main:app --reload` | API en modo desarrollo.                  |
