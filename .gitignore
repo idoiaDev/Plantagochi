@@ -1,0 +1,192 @@
+# =============================================================================
+#  .gitignore de la RAÍZ de Plantagochi
+# -----------------------------------------------------------------------------
+.git.bak/
+*.git.bak/
+
+
+# -----------------------------------------------------------------------------
+#  Secretos: NUNCA deben subirse
+# -----------------------------------------------------------------------------
+
+# Variables de entorno. Las plantillas .example sí se versionan.
+.env
+.env.*
+!.env.example
+
+# Configuración local del ESP32: lleva el SSID y la CONTRASEÑA del WiFi.
+config.h
+!config.example.h
+
+# Config de EAS (builds de la app móvil): lleva la URL de la API de tu servidor.
+# La plantilla eas.json.example sí se versiona.
+eas.json
+!eas.json.example
+
+# Firebase / Google Services: clave de API del proyecto Android.
+google-services.json
+GoogleService-Info.plist
+
+# Firmas y credenciales móviles (keystore de Android, claves de push iOS...).
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+*.cer
+*.certSigningRequest
+
+# Credenciales de servicios (service accounts de Firebase, etc.).
+credentials.json
+serviceAccount*.json
+secrets*.json
+*firebase-adminsdk*.json
+
+# Dump de la base de datos con datos reales (humedad, historial de plantas).
+# Lo genera backup.sh; no tiene por qué estar en el repo.
+plants.sql
+*.dump
+*.backup
+
+# Script de backup local: es una utilidad de la máquina, apunta al contenedor
+# de Postgres de tu PC (CONTAINER_NAME) y no al del servidor.
+backup.sh
+
+# Exportaciones mensuales de plant_log (CSV con datos de las plantas).
+exports/
+
+# Archivos de instrucciones y licencias ajenos al proyecto
+AGENTS.md
+LICENSE
+
+
+# -----------------------------------------------------------------------------
+#  Python (api/)
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+ENV/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.eggs/
+*.egg-info/
+.coverage
+.coverage.*
+coverage/
+htmlcov/
+pip-wheel-metadata/
+
+
+# -----------------------------------------------------------------------------
+#  Node / JavaScript (web/, mobile/)
+# -----------------------------------------------------------------------------
+node_modules/
+.npm/
+.yarn/
+.pnpm-store/
+*.tsbuildinfo
+.eslintcache
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+pnpm-debug.*
+lerna-debug.*
+
+
+# -----------------------------------------------------------------------------
+#  Expo / React Native (mobile/)
+# -----------------------------------------------------------------------------
+.expo/
+.expo-shared/
+web-build/
+expo-env.d.ts
+*.orig.*
+.kotlin/
+
+# Carpetas nativas que genera "expo prebuild" (Continuous Native Generation).
+mobile/ios/
+mobile/android/
+ios/
+android/
+
+
+# -----------------------------------------------------------------------------
+#  ESP32 / Arduino / PlatformIO (esp32_code/)
+# -----------------------------------------------------------------------------
+.pio/
+.pioenvs/
+.piolibdeps/
+*.o
+*.s
+*.elf
+*.bin
+*.hex
+esp32_code/plantagochi_gc9d01/
+
+
+# -----------------------------------------------------------------------------
+#  Build genérico
+# -----------------------------------------------------------------------------
+build/
+dist/
+out/
+.next/
+.nuxt/
+
+
+# -----------------------------------------------------------------------------
+#  Logs y ficheros temporales
+# -----------------------------------------------------------------------------
+logs/
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+
+# -----------------------------------------------------------------------------
+#  Bases de datos locales
+#
+#  Ojo: el fichero "db" de la raíz (el esquema de la base de datos) NO lleva
+#  extensión, así que este patrón no lo toca. Se versiona a propósito.
+# -----------------------------------------------------------------------------
+*.sqlite
+*.sqlite3
+*.db
+
+
+# -----------------------------------------------------------------------------
+#  Editores
+# -----------------------------------------------------------------------------
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.sublime-project
+*.sublime-workspace

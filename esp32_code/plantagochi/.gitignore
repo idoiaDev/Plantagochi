@@ -1,0 +1,9 @@
+# Configuración local con credenciales: NO se sube al repositorio.
+config.h
+
+# Artefactos de compilación de Arduino / PlatformIO
+build/
+*.o
+*.s
+.pio/
+.vscode/

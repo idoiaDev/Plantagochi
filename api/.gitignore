@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+
+# CSV mensuales de plant_log (se montan desde el host, no van al repo)
+exports/

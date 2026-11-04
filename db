@@ -1,0 +1,196 @@
+-- Crear la base de datos (solo la primera vez; si ya existe, da error y se
+-- sigue con el resto del script).
+CREATE DATABASE plants;
+
+-- IMPORTANTE: a partir de aquí hay que estar conectado a la base "plants".
+-- Si ejecutas este fichero tal cual, las tablas se crean en la base que
+-- tengas abierta por defecto, que puede no ser la correcta. Con psql:
+--
+--     psql -U postgres -d plants -f db
+--
+-- (si ya estabas conectado a otra base, con \c plants antes de continuar).
+
+-- Extensión pgvector: imprescindible para la columna plant.embedding (v2).
+-- La imagen pgvector/pgvector:pg16 la trae instalada, pero hay que activarla.
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Tabla: plant
+CREATE TABLE plant (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    image TEXT
+);
+
+-- Tabla: plant_state
+CREATE TABLE plant_state (
+    id SERIAL PRIMARY KEY,
+    plant_id INTEGER NOT NULL,
+    humidity REAL,
+
+    CONSTRAINT fk_plant
+        FOREIGN KEY (plant_id)
+        REFERENCES plant (id)
+        ON DELETE CASCADE
+);
+
+ALTER TABLE plant_state
+ADD COLUMN created_at TIMESTAMP DEFAULT NOW();
+
+-- =============================================================================
+--  MIGRACIÓN v2: tipos de planta, device_id y umbral de riego por planta
+--  =============================================================================
+--  EJECUTAR SOLO SOBRE LA BASE CREADA ARRIBA (o tu versión en uso).
+--  NO hace falta ningún seed: el primer tipo de planta se crea desde la app y
+--  nace con las imágenes por defecto de api\images\ (carpeta) definidas en
+--  api\default_images.py (240x240 RGB565, 3 frames por estado; ficheroausente
+--  -> rectángulo gris). Sustituye los ficheros de api\images\ para cambiar los
+--  defaults. Las imágenes reales de cada tipo se meten a mano por SQL
+--  (UPDATE de las columnas img_*).
+-- =============================================================================
+
+-- 1) Tipos de planta. Cada tipo tiene 4 estados (superhappy, happy, sad,
+--    supersad) con 3 imágenes cada uno: frame base (obligatoria) + 2 frames de
+--    animación (opcionales). Las imágenes se guardan como BYTEA con los píxeles
+--    RGB565 crudos (cada uint16_t = 2 bytes, little-endian). Ni hex, ni Base64.
+CREATE TABLE plant_type (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    img_width  INTEGER NOT NULL DEFAULT 240,
+    img_height INTEGER NOT NULL DEFAULT 240,
+
+    img_superhappy         BYTEA NOT NULL,
+    img_superhappy_change1 BYTEA,
+    img_superhappy_change2 BYTEA,
+
+    img_happy              BYTEA NOT NULL,
+    img_happy_change1      BYTEA,
+    img_happy_change2      BYTEA,
+
+    img_sad                BYTEA NOT NULL,
+    img_sad_change1        BYTEA,
+    img_sad_change2        BYTEA,
+
+    img_supersad           BYTEA NOT NULL,
+    img_supersad_change1   BYTEA,
+    img_supersad_change2   BYTEA
+);
+
+-- 2) Nuevas columnas en plant (nullable temporalmente para poder migrar filas).
+ALTER TABLE plant ADD COLUMN type_id INTEGER REFERENCES plant_type(id);
+ALTER TABLE plant ADD COLUMN device_id TEXT;
+ALTER TABLE plant ADD COLUMN min_humidity REAL DEFAULT 30;
+ALTER TABLE plant ADD COLUMN updated_at TIMESTAMP DEFAULT NOW();
+ALTER TABLE plant ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE plant ADD embedding vector(768);
+
+-- 3) device_id único y obligatorio (backfill para filas existentes).
+UPDATE plant SET device_id = 'legacy-' || id WHERE device_id IS NULL;
+ALTER TABLE plant ALTER COLUMN device_id SET NOT NULL;
+ALTER TABLE plant ADD CONSTRAINT plant_device_id_key UNIQUE (device_id);
+
+-- 4) min_humidity acotada a 0-100.
+ALTER TABLE plant ADD CONSTRAINT plant_min_humidity_check
+    CHECK (min_humidity >= 0 AND min_humidity <= 100);
+
+-- 5) Índice de apoyo para obtener la última lectura de cada planta.
+CREATE INDEX idx_plant_state_plant_id_id ON plant_state (plant_id, id DESC);
+
+-- 6) plant.type_id queda NULLABLE a propósito: las plantas de antes de esta
+--    migración no tienen tipo. Se les asigna uno abriéndolas en la app
+--    (editar planta -> elegir tipo), o por SQL:
+--       UPDATE plant SET type_id = 1 WHERE type_id IS NULL;
+
+-- Tabla: plant_log
+-- Historial de cambios de humedad. Solo se anota cuando la humedad cambia de
+-- verdad: si el sensor sigue marcando 24 no se repite la fila.
+-- plant_state queda con una única fila por planta (su última lectura), así que
+-- este log es el único sitio donde queda el recorrido.
+CREATE TABLE plant_log (
+    id SERIAL PRIMARY KEY,
+    plant_id INTEGER NOT NULL,
+    humidity REAL,
+    created_at TIMESTAMP DEFAULT NOW(),
+
+    CONSTRAINT fk_plant_log
+        FOREIGN KEY (plant_id)
+        REFERENCES plant (id)
+        ON DELETE CASCADE
+);
+
+-- Índice para releer el recorrido de una planta en orden.
+CREATE INDEX idx_plant_log_plant_id_id ON plant_log (plant_id, id DESC);
+
+-- El export mensual borra por rango de fecha, así que también por created_at.
+CREATE INDEX idx_plant_log_created_at ON plant_log (created_at);
+
+-- =============================================================================
+--  MIGRACIÓN v3: plant_state guarda solo el último estado
+-- =============================================================================
+--  AFECTA A UNA BASE YA CREADA CON LAS MIGRACIONES ANTERIORES.
+--
+--  plant_state pasa a tener una única fila por planta (la última lectura) y
+--  plant_log se queda con el historial. Antes plant_state era un append-only:
+--  guardaba TODAS las lecturas y había que pedir la última con un LATERAL.
+--
+--  Las lecturas que ya hubiera en plant_state se descartan: plant_log empieza
+--  vacía a propósito. Lo que sí se conserva es la última lectura de cada planta,
+--  para que la app no se quede sin datos hasta el próximo POST del ESP32 (que
+--  puede tardar 15 minutos).
+--
+--  Orden importante: el paso 1 compara a.id < b.id, así que la columna id tiene
+--  que existir todavía cuando se ejecuta. Por eso se depura antes de quitarla
+--  en el paso 2, y no al revés.
+--
+--  EJECUTAR UNA SOLA VEZ.
+-- =============================================================================
+
+-- 1) plant_state se queda con la fila más reciente de cada planta.
+DELETE FROM plant_state a USING plant_state b
+WHERE a.plant_id = b.plant_id AND a.id < b.id;
+
+-- 2) La PK pasa de id a plant_id: es lo que garantiza la fila única por planta
+--    y lo que permite el ON CONFLICT (plant_id) de api/db.py.
+ALTER TABLE plant_state DROP CONSTRAINT IF EXISTS plant_state_pkey;
+ALTER TABLE plant_state DROP COLUMN IF EXISTS id;
+ALTER TABLE plant_state ADD CONSTRAINT plant_state_pkey PRIMARY KEY (plant_id);
+
+-- 3) La secuencia y el índice de (plant_id, id DESC) ya no sirven para nada:
+--    el primero colgaba de la columna id eliminada y el segundo solo existía
+--    para localizar la última lectura.
+DROP SEQUENCE IF EXISTS plant_state_id_seq;
+DROP INDEX IF EXISTS idx_plant_state_plant_id_id;
+
+-- =============================================================================
+--  MIGRACIÓN v4: notificaciones push y fecha de las imágenes del tipo
+-- =============================================================================
+--  AFECTA A UNA BASE YA CREADA CON LAS MIGRACIONES ANTERIORES.
+--
+--  Estas tablas NO las crea api/db.py: db.py no lleva DDL, solo consulta. Si
+--  tu base ya existe y le faltan, ejecuta esta sección (es idempotente).
+--
+--  Se dejan aquí para que un clon pueda crear la base completa de una sola vez,
+--  sin depender de ningún arranque de la API.
+--
+--  EJECUTAR UNA SOLA VEZ.
+-- =============================================================================
+
+-- 1) Tokens de Firebase (FCM) de los móviles que quieren recibir avisos.
+--    token es UNIQUE: db.py hace INSERT ... ON CONFLICT (token) para refrescar
+--    la fecha de un token ya registrado.
+CREATE TABLE IF NOT EXISTS push_token (
+    id SERIAL PRIMARY KEY,
+    token TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 2) Memoria de qué plantas tienen una notificación "viva", para no repetir el
+--    aviso mientras la planta siga seca. ON DELETE CASCADE limpia la fila al
+--    borrar la planta, sin mantenimiento manual.
+CREATE TABLE IF NOT EXISTS plant_push (
+    plant_id INTEGER PRIMARY KEY REFERENCES plant (id) ON DELETE CASCADE,
+    pushed_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 3) Fecha de la última actualización de las imágenes de un tipo de planta.
+--    La web/app la usan para saber si tienen que volver a descargarlas.
+ALTER TABLE plant_type ADD COLUMN IF NOT EXISTS images_updated_at TIMESTAMPTZ;

@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: plantagochi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - plantagochi_postgres_data:/var/lib/postgresql/data
+
+  api:
+    build: .
+    container_name: plantagochi-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./exports:/app/exports
+    networks:
+      - api_default
+      - proxy
+
+volumes:
+  plantagochi_postgres_data:
+
+networks:
+  api_default:
+    external: true
+  proxy:
+    external: true
