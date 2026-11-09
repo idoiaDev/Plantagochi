@@ -586,7 +586,7 @@ def searchPlantsByEmbedding(embedding, limit, max_distance):
     conn, cursor = createConexion()
     try:
         cursor.execute(sql, params)
-        return [_plant_dict(row, row[-1]) for row in cursor.fetchall()]
+        return [_plant_dict(row[:-1], row[-1]) for row in cursor.fetchall()]
     finally:
         cursor.close()
         conn.close()
